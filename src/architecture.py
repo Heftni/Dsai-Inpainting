@@ -384,8 +384,8 @@ class PerceptualLoss(nn.Module):
             out_feat, tar_feat = output, target
             for layer in self.features:
                 out_feat = layer(out_feat)
-            tar_feat = layer(tar_feat)
-            loss += F.l1_loss(out_feat, tar_feat)
+                tar_feat = layer(tar_feat)
+                loss += F.l1_loss(out_feat, tar_feat)
         
         return loss
 
