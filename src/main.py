@@ -47,18 +47,17 @@ if __name__ == '__main__':
     # Getestet und optimiert für beste Ergebnisse!
     # ============================================
     
-    # Learning rate - konservativ für Stabilität (RTX 4090 kompatibel)
-    config_dict['learningrate'] = 2e-4  # Niedrigerer Start für AMP Stabilität
+    # Learning rate - etwas höher jetzt da Training stabil ist
+    config_dict['learningrate'] = 5e-4  # Erhöht für schnellere Konvergenz
     
     # Weight decay - moderate Regularisierung
-    config_dict['weight_decay'] = 1e-4  # Etwas mehr Regularisierung für Stabilität
+    config_dict['weight_decay'] = 1e-4
     
     # Training duration - ausreichend für Konvergenz
     config_dict['n_updates'] = 100000  # 100k reicht für gute Ergebnisse
     
-    # Batch size - RTX 4090 mit 24GB VRAM (reduziert für Stabilität)
-    # Kleinere Batch Size = stabilere Gradienten mit AMP
-    config_dict['batchsize'] = 32  # Kleiner für 4090 und AMP Stabilität
+    # Batch size - RTX 4090 kann mehr
+    config_dict['batchsize'] = 48  # Erhöht für bessere GPU Auslastung
     
     # Early stopping - genug Geduld aber nicht zu viel
     config_dict['early_stopping_patience'] = 20
