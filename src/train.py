@@ -17,7 +17,7 @@ from architecture import MyModel, CombinedLoss
 from utils import plot, evaluate_model
 
 import torch
-import torch.cuda.amp as amp
+import torch.amp
 import numpy as np
 import os
 import platform
@@ -57,7 +57,8 @@ def train(seed, testset_ratio, validset_ratio, data_path, results_path, early_st
     
     # Mixed Precision für massive Speedups
     use_amp = device.type == 'cuda'
-    scaler = amp.GradScaler() if use_amp else None
+    # GradScaler mit konservativen Settings für Stabilität
+    scaler = torch.amp.GradScaler('cuda', init_scale=1024, growth_interval=2000) if use_amp else None
 
     if use_wandb:
         wandb.login()
@@ -156,15 +157,15 @@ def train(seed, testset_ratio, validset_ratio, data_path, results_path, early_st
         eps=1e-8
     )
     
-    # OneCycleLR für super convergence - bewährte Parameter
+    # OneCycleLR für super convergence - KONSERVATIVE Parameter für 4090/AMP
     scheduler = OneCycleLR(
         optimizer,
-        max_lr=learningrate * 10,  # Peak bei 1e-2 wenn base lr = 1e-3
+        max_lr=learningrate * 5,   # Peak bei 1e-3 - konservativer für AMP
         total_steps=n_updates,
-        pct_start=0.05,            # 5% warmup (stabiler als 3%)
+        pct_start=0.1,             # 10% warmup (stabiler mit AMP)
         anneal_strategy='cos',
-        div_factor=10,             # Start lr = max_lr / 10
-        final_div_factor=1000      # End lr = max_lr / 10000
+        div_factor=5,              # Start lr = max_lr / 5 (sanfterer Start)
+        final_div_factor=100       # End lr = max_lr / 500
     )
 
     if use_wandb:
@@ -200,22 +201,36 @@ def train(seed, testset_ratio, validset_ratio, data_path, results_path, early_st
 
             optimizer.zero_grad(set_to_none=True)
 
-            # Mixed Precision Training
+            # Mixed Precision Training mit NaN Protection
             if use_amp:
-                with amp.autocast():
+                with torch.amp.autocast('cuda'):
                     output = network(input)
                     loss = combined_loss(output, target)
                 
+                # NaN Check - Skip step if loss is NaN
+                if torch.isnan(loss) or torch.isinf(loss):
+                    print(f"⚠️  NaN/Inf loss at step {i+1}, skipping...")
+                    optimizer.zero_grad(set_to_none=True)
+                    scaler.update()  # Reset scaler
+                    continue
+                
                 scaler.scale(loss).backward()
                 scaler.unscale_(optimizer)
-                torch.nn.utils.clip_grad_norm_(network.parameters(), max_norm=1.0)
+                # Aggressiveres Gradient Clipping für Stabilität
+                torch.nn.utils.clip_grad_norm_(network.parameters(), max_norm=0.5)
                 scaler.step(optimizer)
                 scaler.update()
             else:
                 output = network(input)
                 loss = combined_loss(output, target)
+                
+                if torch.isnan(loss) or torch.isinf(loss):
+                    print(f"⚠️  NaN/Inf loss at step {i+1}, skipping...")
+                    optimizer.zero_grad(set_to_none=True)
+                    continue
+                    
                 loss.backward()
-                torch.nn.utils.clip_grad_norm_(network.parameters(), max_norm=1.0)
+                torch.nn.utils.clip_grad_norm_(network.parameters(), max_norm=0.5)
                 optimizer.step()
             
             scheduler.step()

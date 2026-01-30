@@ -47,18 +47,18 @@ if __name__ == '__main__':
     # Getestet und optimiert für beste Ergebnisse!
     # ============================================
     
-    # Learning rate - optimal für große Batch Size mit OneCycleLR
-    config_dict['learningrate'] = 1e-3  # Konservativerer Start, OneCycleLR geht bis 1e-2
+    # Learning rate - konservativ für Stabilität (RTX 4090 kompatibel)
+    config_dict['learningrate'] = 2e-4  # Niedrigerer Start für AMP Stabilität
     
     # Weight decay - moderate Regularisierung
-    config_dict['weight_decay'] = 5e-5  # Leicht reduziert für bessere Generalisierung
+    config_dict['weight_decay'] = 1e-4  # Etwas mehr Regularisierung für Stabilität
     
     # Training duration - ausreichend für Konvergenz
     config_dict['n_updates'] = 100000  # 100k reicht für gute Ergebnisse
     
-    # Batch size - RTX 5090 mit 32GB VRAM
-    # base_channels=64 mit batch=128 ist sicher, 96 braucht kleinere batch
-    config_dict['batchsize'] = 64  # Sicher für base_channels=64
+    # Batch size - RTX 4090 mit 24GB VRAM (reduziert für Stabilität)
+    # Kleinere Batch Size = stabilere Gradienten mit AMP
+    config_dict['batchsize'] = 32  # Kleiner für 4090 und AMP Stabilität
     
     # Early stopping - genug Geduld aber nicht zu viel
     config_dict['early_stopping_patience'] = 20

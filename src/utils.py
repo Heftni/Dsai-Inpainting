@@ -54,24 +54,35 @@ def testset_plot(input_array, output_array, path, index):
 
 
 def evaluate_model(network: torch.nn.Module, dataloader: torch.utils.data.DataLoader, loss_fn, device: torch.device):
-    """Returnse MSE and RMSE of the model on the provided dataloader"""
+    """Returns MSE and RMSE of the model on the provided dataloader"""
     network.eval()
     loss = 0.0
+    n_batches = 0
     with torch.no_grad():
         for data in dataloader:
             input_array, target = data
             input_array = input_array.to(device)
             target = target.to(device)
 
-            outputs = network(input_array)
+            # Validation in FP32 für stabile Metriken
+            with torch.amp.autocast('cuda', enabled=False):
+                outputs = network(input_array).float()
+                batch_loss = loss_fn(outputs, target.float())
+            
+            # Skip NaN losses in validation
+            if not (torch.isnan(batch_loss) or torch.isinf(batch_loss)):
+                loss += batch_loss.item()
+                n_batches += 1
 
-            loss += loss_fn(outputs, target).item()
-
-        loss = loss / len(dataloader)
+        # Protect against division by zero
+        if n_batches > 0:
+            loss = loss / n_batches
+        else:
+            loss = float('nan')
 
         network.train()
 
-        return loss, 255.0 * np.sqrt(loss)
+        return loss, 255.0 * np.sqrt(loss) if not np.isnan(loss) else float('nan')
 
 
 def read_compressed_file(file_path: str):
