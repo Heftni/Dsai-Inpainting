@@ -58,14 +58,22 @@ def evaluate_model(network: torch.nn.Module, dataloader: torch.utils.data.DataLo
     network.eval()
     loss = 0.0
     n_batches = 0
+    
+    # Device-agnostic: nur auf CUDA autocast verwenden
+    use_amp = device.type == 'cuda'
+    
     with torch.no_grad():
         for data in dataloader:
             input_array, target = data
             input_array = input_array.to(device)
             target = target.to(device)
 
-            # Validation in FP32 für stabile Metriken
-            with torch.amp.autocast('cuda', enabled=False):
+            # Validation immer in FP32 für stabile Metriken
+            if use_amp:
+                with torch.amp.autocast('cuda', enabled=False):
+                    outputs = network(input_array).float()
+                    batch_loss = loss_fn(outputs, target.float())
+            else:
                 outputs = network(input_array).float()
                 batch_loss = loss_fn(outputs, target.float())
             

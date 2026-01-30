@@ -185,7 +185,7 @@ def train(seed, testset_ratio, validset_ratio, data_path, results_path, early_st
     print(f"Mixed Precision (AMP): {use_amp}")
     print(f"TF32 enabled: {torch.backends.cuda.matmul.allow_tf32}")
     print(f"Num workers: {num_workers}")
-    print(f"Learning rate: {learningrate} (max: {learningrate * 10})")
+    print(f"Learning rate: {learningrate} (max: {learningrate * 5})")
     print(f"Weight decay: {weight_decay}")
     print(f"Batch size: {batchsize}")
     print(f"Max updates: {n_updates:,}")
@@ -211,7 +211,8 @@ def train(seed, testset_ratio, validset_ratio, data_path, results_path, early_st
                 if torch.isnan(loss) or torch.isinf(loss):
                     print(f"⚠️  NaN/Inf loss at step {i+1}, skipping...")
                     optimizer.zero_grad(set_to_none=True)
-                    scaler.update()  # Reset scaler
+                    # Wichtig: Nicht scaler.update() aufrufen ohne vorheriges unscale_!
+                    i += 1
                     continue
                 
                 scaler.scale(loss).backward()
@@ -220,6 +221,7 @@ def train(seed, testset_ratio, validset_ratio, data_path, results_path, early_st
                 torch.nn.utils.clip_grad_norm_(network.parameters(), max_norm=0.5)
                 scaler.step(optimizer)
                 scaler.update()
+                scheduler.step()
             else:
                 output = network(input)
                 loss = combined_loss(output, target)
@@ -227,13 +229,13 @@ def train(seed, testset_ratio, validset_ratio, data_path, results_path, early_st
                 if torch.isnan(loss) or torch.isinf(loss):
                     print(f"⚠️  NaN/Inf loss at step {i+1}, skipping...")
                     optimizer.zero_grad(set_to_none=True)
+                    i += 1
                     continue
                     
                 loss.backward()
                 torch.nn.utils.clip_grad_norm_(network.parameters(), max_norm=0.5)
                 optimizer.step()
-            
-            scheduler.step()
+                scheduler.step()
 
             current_loss = loss.item()
             loss_list.append(current_loss)

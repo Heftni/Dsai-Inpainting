@@ -371,21 +371,28 @@ class PerceptualLoss(nn.Module):
     def forward(self, output, target):
         # WICHTIG: VGG in FP32 ausführen für numerische Stabilität mit AMP
         # Dies verhindert NaN bei Mixed Precision Training
-        with torch.amp.autocast('cuda', enabled=False):
-            output = output.float()
-            target = target.float()
-            
-            # Normalize
-            output = (output - self.mean) / self.std
-            target = (target - self.mean) / self.std
-            
-            loss = 0.0
-            # Effiziente sequentielle Feature-Extraktion
-            out_feat, tar_feat = output, target
-            for layer in self.features:
-                out_feat = layer(out_feat)
-                tar_feat = layer(tar_feat)
-                loss += F.l1_loss(out_feat, tar_feat)
+        # Device-agnostic: nur auf CUDA autocast verwenden
+        device = output.device
+        use_cuda = device.type == 'cuda'
+        
+        if use_cuda:
+            with torch.amp.autocast('cuda', enabled=False):
+                return self._compute_loss(output.float(), target.float())
+        else:
+            return self._compute_loss(output.float(), target.float())
+    
+    def _compute_loss(self, output, target):
+        # Normalize
+        output = (output - self.mean) / self.std
+        target = (target - self.mean) / self.std
+        
+        loss = 0.0
+        # Effiziente sequentielle Feature-Extraktion
+        out_feat, tar_feat = output, target
+        for layer in self.features:
+            out_feat = layer(out_feat)
+            tar_feat = layer(tar_feat)
+            loss += F.l1_loss(out_feat, tar_feat)
         
         return loss
 

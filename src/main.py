@@ -66,8 +66,10 @@ if __name__ == '__main__':
     # Wandb logging
     config_dict['use_wandb'] = False 
     
-    # Perceptual Loss - verbessert visuelle Qualität
-    config_dict['use_perceptual_loss'] = True
+    # Perceptual Loss - DEAKTIVIERT für RTX 4090 Stabilität
+    # VGG16 Features können mit AMP NaN produzieren
+    # Kann später auf 5090 wieder aktiviert werden
+    config_dict['use_perceptual_loss'] = False
 
     # Logging intervals
     config_dict['print_train_stats_at'] = 100
