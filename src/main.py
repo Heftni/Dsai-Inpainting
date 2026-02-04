@@ -34,14 +34,14 @@ if __name__ == '__main__':
         # Device
         'device': None,  # Auto-detect
         
-        # Training - STABILE Parameter
-        'learningrate': 1e-4,       # Konservativ für Stabilität
+        # Training - OPTIMIERTE Parameter
+        'learningrate': 2e-4,       # Leicht erhöht da stabil
         'weight_decay': 1e-5,       # Leichte Regularisierung
-        'n_updates': 50000,         # 50k für schnelleres Testen
+        'n_updates': 75000,         # Mehr Training für bessere Ergebnisse
         'batchsize': 32,            # Sicher für alle GPUs
         
         # Early Stopping
-        'early_stopping_patience': 15,
+        'early_stopping_patience': 7,
         
         # Logging
         'use_wandb': False,

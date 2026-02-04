@@ -57,9 +57,28 @@ class DecoderBlock(nn.Module):
         return self.conv(x)
 
 
+class SEBlock(nn.Module):
+    """Squeeze-and-Excitation Block - stabile Channel Attention"""
+    def __init__(self, channels: int, reduction: int = 16):
+        super().__init__()
+        self.pool = nn.AdaptiveAvgPool2d(1)
+        self.fc = nn.Sequential(
+            nn.Linear(channels, channels // reduction, bias=False),
+            nn.ReLU(inplace=True),
+            nn.Linear(channels // reduction, channels, bias=False),
+            nn.Sigmoid()
+        )
+    
+    def forward(self, x):
+        b, c, _, _ = x.size()
+        y = self.pool(x).view(b, c)
+        y = self.fc(y).view(b, c, 1, 1)
+        return x * y
+
+
 class ResBlock(nn.Module):
-    """Simple Residual Block"""
-    def __init__(self, channels: int):
+    """Residual Block mit SE-Attention"""
+    def __init__(self, channels: int, use_se: bool = True):
         super().__init__()
         self.conv = nn.Sequential(
             nn.Conv2d(channels, channels, kernel_size=3, padding=1, bias=False),
@@ -68,10 +87,11 @@ class ResBlock(nn.Module):
             nn.Conv2d(channels, channels, kernel_size=3, padding=1, bias=False),
             nn.BatchNorm2d(channels),
         )
+        self.se = SEBlock(channels) if use_se else nn.Identity()
         self.relu = nn.ReLU(inplace=True)
     
     def forward(self, x):
-        return self.relu(self.conv(x) + x)
+        return self.relu(self.se(self.conv(x)) + x)
 
 
 class MyModel(nn.Module):
@@ -91,9 +111,10 @@ class MyModel(nn.Module):
         self.enc3 = EncoderBlock(bc * 2, bc * 4)          # 128 -> 256
         self.enc4 = EncoderBlock(bc * 4, bc * 8)          # 256 -> 512
         
-        # Bottleneck
+        # Bottleneck - mehr Kapazität
         self.bottleneck = nn.Sequential(
             ConvBlock(bc * 8, bc * 8),
+            ResBlock(bc * 8),
             ResBlock(bc * 8),
             ResBlock(bc * 8),
         )
